@@ -2,6 +2,12 @@
 
 A fast, private image redaction tool that runs entirely in your browser. No uploads, no servers — your images never leave your device.
 
+ > [!IMPORTANT]
+  > **This project is not actively maintained.** It is provided as-is, with no
+  > warranty of any kind. Issues and pull requests may not receive a response,
+  > and bugs may not be fixed even if reported. You're welcome to fork it and
+  > maintain your own copy under the terms of the [licence](#license).
+
 Don't want to host it yourself? **Use it here: [blurrr.it](https://blurrr.it/)**
 
 ## Why blurrr?
