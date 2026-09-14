@@ -1,79 +1,34 @@
-# blurrr
+# redax
 
-A fast, private image redaction tool that runs entirely in your browser. No uploads, no servers — your images never leave your device.
+Free, local **photo privacy** for sharing. Open an image, hide what you choose (blur / redact / erase / brush), then save — nothing uploads, no accounts, no ads, no tracking.
 
- > [!IMPORTANT]
-  > **This project is not actively maintained.** It is provided as-is, with no
-  > warranty of any kind. Issues and pull requests may not receive a response,
-  > and bugs may not be fixed even if reported. You're welcome to fork it and
-  > maintain your own copy under the terms of the [licence](#license).
+**Next:** a short metadata panel on the same screen — location, date, captions/keywords, camera — so you keep, edit, or remove identifying tags before export. Export will be allowlist-from-redacted-pixels (no original thumbnail sneaking through).
 
-Don't want to host it yourself? **Use it here: [blurrr.it](https://blurrr.it/)**
+Based on [Blurrr](https://github.com/creativar/blurrr) (ISC).
 
-## Why blurrr?
+## Why
 
-- **Private by design** — Your images are processed locally in your browser. Nothing is uploaded anywhere.
-- **No sign-up, no ads** — Just open the page and start redacting.
-- **Works offline** — Once loaded, no internet connection required.
+Auto-blur-every-face / strip-every-tag gets portfolio privacy wrong. You might want your face in and a kid’s face out, a letter gone, GPS off the house. redax is for deciding that yourself, quickly, in one place.
 
 ## Features
 
-- **Blur, Redact, or Erase** — Gaussian blur, solid black redaction, or white erase
-- **Multiple shapes** — Rectangle, rounded rectangle, or ellipse
-- **Adjustable blur** — Control strength and optional chunky/pixelated mode
-- **Region editing** — Move, resize, rotate, and delete individual regions
-- **Image transforms** — Rotate, flip, and crop (all undoable)
-- **Undo/Redo** — Full history with keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z)
-- **Drag & drop** — Drop an image onto the page or click to browse
-- **Clipboard paste** — Paste screenshots directly with Ctrl+V / Cmd+V
-- **Face detection** — Auto-detect and blur faces (Chrome/Edge with experimental flag)
-- **Email detection** — OCR-powered auto-detection of email addresses via Tesseract.js
-- **Before/after toggle** — Hold Alt or press the button to preview the original image
-- **EXIF stripping** — Saved images have all metadata (location, camera, timestamps) removed
-- **Cross-browser blur** — Fallback blur for Safari/iOS browsers without `ctx.filter` support
+- Blur, redact, erase, brush
+- Rectangle / rounded / ellipse regions; move, resize, rotate, delete
+- Rotate, flip, crop (undoable)
+- Undo / redo (`Ctrl/Cmd+Z`)
+- Drag & drop or paste a screenshot
+- Runs entirely in the browser
 
-## Use cases
+## Develop
 
-- Redact personal info from screenshots before sharing
-- Blur faces or license plates in photos
-- Clean up screenshots for bug reports or documentation
-- Censor sensitive data in images for social media
-
-## Getting started
-
-```sh
-npm install
-npm run dev
+```bash
+make help      # list targets
+make install
+make dev
+make build
+make preview
 ```
-
-Open [http://localhost:5173](http://localhost:5173) in your browser.
-
-## Build
-
-```sh
-npm run build
-```
-
-Output goes to `dist/`.
-
-## Tech
-
-React 19, Vite, Canvas API, Tesseract.js (lazy-loaded). Zero backend.
-
-## Analytics
-
-blurrr uses [Plausible](https://plausible.io/), a privacy-friendly analytics tool, to track page visits and image saves. No cookies, no personal data collected.
-
-Analytics is configured via the `VITE_PLAUSIBLE_DOMAIN` environment variable. If not set, analytics is disabled. To use your own Plausible domain, create a `.env` file:
-
-```
-VITE_PLAUSIBLE_DOMAIN=yourdomain.com
-```
-
-Or set it in your hosting provider's environment variables (e.g. Cloudflare Pages).
-
-A custom event `Image Saved` is sent when a user saves an image. To track this in Plausible, add a custom goal: Settings > Goals > Add Goal > Custom Event > `Image Saved`.
 
 ## License
 
-ISC
+ISC. See [Blurrr](https://github.com/creativar/blurrr) for the original project.
