@@ -6,7 +6,7 @@ DIST ?= dist
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install dev build preview clean clean-all reinstall check ci
+.PHONY: help install dev build preview test clean clean-all reinstall check ci
 
 help: ## List all targets
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} \
@@ -25,7 +25,10 @@ build: ## Production build into dist/
 preview: ## Preview the production build locally
 	$(NPM) run preview
 
-check: build ## Verify the app builds (alias for build)
+test: ## Prove allowlist export strips GPS/place from a dirty JPEG
+	$(NPM) run test
+
+check: build test ## Verify the app builds and the metadata proof passes
 	@echo "check ok"
 
 ci: install check ## Install deps and verify build (CI-friendly)

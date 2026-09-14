@@ -1,4 +1,7 @@
 import { useRef, useState, useEffect } from 'react'
+import MetadataPanel from './MetadataPanel.jsx'
+import { emptySnapshot, imageOpenErrorNote, parsePhotoMetadata } from './metadata.js'
+import { exportRedactedImage } from './exportImage.js'
 
 let nextId = 1
 
@@ -332,6 +335,12 @@ export default function App() {
   const [redactColor, setRedactColor] = useState('#000000')
   const [showAbout, setShowAbout] = useState(false)
   const [showMetadata, setShowMetadata] = useState(false)
+  const [showNotes, setShowNotes] = useState(false)
+  const [meta, setMeta] = useState(() => emptySnapshot())
+  const [imageError, setImageError] = useState(null)
+  const [warningDismissed, setWarningDismissed] = useState(false)
+  const loadGenRef = useRef(0)
+  const savingRef = useRef(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [selectedId, _setSelectedId] = useState(null)
   const [cropping, _setCropping] = useState(false)
@@ -344,6 +353,7 @@ export default function App() {
   const openAbout = () => { setShowMetadata(false); setShowAbout(true) }
   const openMetadata = () => { setShowAbout(false); setShowMetadata(true) }
   const closeModals = () => { setShowAbout(false); setShowMetadata(false) }
+  const patchMeta = (key, part) => setMeta((m) => ({ ...m, [key]: { ...m[key], ...part } }))
 
   const setSelectedId = (id) => { selectedIdRef.current = id; _setSelectedId(id) }
   const getScale = () => { const c = canvasRef.current; if (!c) return 1; const r = c.getBoundingClientRect(); return c.width / (r.width || 1) }
@@ -425,13 +435,19 @@ export default function App() {
   const redo = () => { if (!canRedo()) return; indexRef.current++; regionsRef.current = structuredClone(historyRef.current[indexRef.current]); setSelectedId(null); forceUpdate(n => n + 1) }
 
   useEffect(() => {
-    if (!showAbout && !showMetadata) return
+    if (!showAbout && !showMetadata && !showNotes) return
     const onKey = (e) => {
-      if (e.key === 'Escape') closeModals()
+      if (e.key !== 'Escape') return
+      if (showAbout || showMetadata) closeModals()
+      else if (showNotes) setShowNotes(false)
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [showAbout, showMetadata])
+  }, [showAbout, showMetadata, showNotes])
+
+  useEffect(() => {
+    if (loaded) setTimeout(fitCanvas, 0)
+  }, [showNotes, loaded])
 
   // Render after every React update
   useEffect(() => { if (loaded) render() })
@@ -523,17 +539,32 @@ export default function App() {
   }
 
   const loadFile = (file) => {
+    const gen = ++loadGenRef.current
     setFileName(file.name.replace(/\.[^.]+$/, '') + '_blurred.png')
+    setImageError(null)
+    setWarningDismissed(false)
+    setMeta(emptySnapshot({ sourceName: file.name, sourceType: file.type }))
+    parsePhotoMetadata(file).then((snap) => {
+      if (gen !== loadGenRef.current) return
+      setMeta(snap)
+    })
     const reader = new FileReader()
     reader.onload = (ev) => {
       const img = new Image()
       img.onload = () => {
+        if (gen !== loadGenRef.current) return
         imgRef.current = img
         const canvas = canvasRef.current
         canvas.width = img.width; canvas.height = img.height
         regionsRef.current = []; historyRef.current = [[]]; indexRef.current = 0; nextId = 1
         setSelectedId(null); setLoaded(true)
         forceUpdate(n => n + 1); setTimeout(fitCanvas, 0)
+      }
+      img.onerror = () => {
+        if (gen !== loadGenRef.current) return
+        setLoaded(false)
+        imgRef.current = null
+        setImageError(imageOpenErrorNote(file))
       }
       img.src = ev.target.result
     }
@@ -722,15 +753,43 @@ export default function App() {
     canvas.style.cursor = 'crosshair'
   }
 
-  const save = () => {
+  const save = async () => {
+    if (savingRef.current || !canvasRef.current) return
+    savingRef.current = true
     const prev = selectedIdRef.current; selectedIdRef.current = null
     render({ showUI: false })
-    const a = document.createElement('a'); a.download = fileName; a.href = canvasRef.current.toDataURL('image/png'); a.click()
-    selectedIdRef.current = prev; render()
+    try {
+      const { blob, fileName: outName } = await exportRedactedImage(canvasRef.current, meta, fileName)
+      const a = document.createElement('a')
+      a.download = outName
+      a.href = URL.createObjectURL(blob)
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+    } finally {
+      selectedIdRef.current = prev
+      render()
+      savingRef.current = false
+    }
   }
 
   const clear = () => { regionsRef.current = []; historyRef.current = [[]]; indexRef.current = 0; imageStackRef.current = []; setSelectedId(null); forceUpdate(n => n + 1) }
-  const removeImage = () => { setLoaded(false); imgRef.current = null; regionsRef.current = []; historyRef.current = [[]]; indexRef.current = 0; imageStackRef.current = []; setSelectedId(null); setCropping(false); cropRef.current = null; forceUpdate(n => n + 1) }
+  const removeImage = () => {
+    loadGenRef.current++
+    setLoaded(false)
+    imgRef.current = null
+    regionsRef.current = []
+    historyRef.current = [[]]
+    indexRef.current = 0
+    imageStackRef.current = []
+    setSelectedId(null)
+    setCropping(false)
+    cropRef.current = null
+    setShowNotes(false)
+    setMeta(emptySnapshot())
+    setImageError(null)
+    setWarningDismissed(false)
+    forceUpdate(n => n + 1)
+  }
 
   const transformImage = (fn) => {
     const img = imgRef.current; if (!img) return
@@ -793,6 +852,16 @@ export default function App() {
         <div className="toolbar-row">
           <span className="logo" onClick={openAbout}>redax</span>
           <button type="button" className="help-btn" title="What's metadata?" aria-label="What's metadata?" onClick={openMetadata}>?</button>
+          <button
+            type="button"
+            className={showNotes ? 'active' : ''}
+            onClick={() => setShowNotes((v) => !v)}
+            disabled={!loaded}
+            title="Photo notes"
+          >
+            Notes
+            {loaded && meta.location.found && <span className="notes-dot" title="This photo has a location" />}
+          </button>
           <div className="sep" />
           <div className="toolbar-dropdown">
             <select value={mode} onChange={(e) => setMode(e.target.value)}>
@@ -880,6 +949,15 @@ export default function App() {
         )}
       </div>
 
+      {loaded && meta.warning && !warningDismissed && (
+        <div className="heic-note">
+          <p>{meta.warning.message}</p>
+          <button type="button" className="text-btn" onClick={() => setShowNotes(true)}>Notes</button>
+          <button type="button" className="modal-close" onClick={() => setWarningDismissed(true)} aria-label="Dismiss">&times;</button>
+        </div>
+      )}
+
+      <div className={`workspace${loaded && showNotes ? ' with-notes' : ''}`}>
       <div className={`canvas-wrap${!loaded ? ' landing-wrap' : ''}`} ref={wrapRef} onDrop={(e) => { e.preventDefault(); setFileDragging(false); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) loadFile(f) }} onDragOver={(e) => { e.preventDefault(); setFileDragging(true) }} onDragLeave={() => setFileDragging(false)}>
         {!loaded && (
           <div className={`drop-zone${fileDragging ? ' dragging' : ''}`}>
@@ -887,8 +965,9 @@ export default function App() {
               <h1 className="landing-title">Let’s get your pics ready to share.</h1>
               <p className="landing-lead">
                 Hide anything you wouldn’t want someone else to keep — a face, a name, a house number.
-                Then check the hidden notes photos can carry, and save.
+                Then check the hidden notes photos can carry — keep, edit, or leave them off — and save.
               </p>
+              {imageError && <p className="heic-note landing">{imageError}</p>}
               <div className="drop-target" onClick={() => fileRef.current.click()}>
                 <div className="icon">&#128444;&#65039;</div>
                 <div className="label">Open or drop a photo</div>
@@ -905,12 +984,12 @@ export default function App() {
                 </li>
                 <li>
                   <span className="step-n">3 · Check</span>
-                  Photos can carry hidden notes.{' '}
+                  Photos can carry hidden notes. Keep, edit, or leave them off.{' '}
                   <button type="button" className="text-btn" onClick={openMetadata}>What’s metadata?</button>
                 </li>
                 <li>
                   <span className="step-n">4 · Save</span>
-                  Download a copy you’re comfortable sharing.
+                  Download a copy you’re comfortable sharing. Extra notes stay off unless you keep them.
                 </li>
               </ol>
               <p className="privacy-note">
@@ -933,6 +1012,15 @@ export default function App() {
           onTouchMove={(e) => { e.preventDefault() }}
         />
       </div>
+      {loaded && showNotes && (
+        <MetadataPanel
+          meta={meta}
+          onPatch={patchMeta}
+          onClose={() => setShowNotes(false)}
+          onOpenHelp={openMetadata}
+        />
+      )}
+      </div>
 
       <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onClick={(e) => { e.target.value = '' }} onChange={(e) => { if (e.target.files[0]) loadFile(e.target.files[0]) }} />
 
@@ -952,10 +1040,10 @@ export default function App() {
                 <li>Draw over what you want to hide — blur, black out, erase, or brush</li>
                 <li>Click a region to move, resize, or delete it</li>
                 <li>
-                  Check the hidden notes photos can carry.{' '}
+                  Open <strong>Notes</strong> to keep, edit, or leave off location, date, captions, and camera.{' '}
                   <button type="button" className="text-btn" onClick={openMetadata}>What’s metadata?</button>
                 </li>
-                <li>Save when you’re happy</li>
+                <li>Save when you’re happy — extra notes stay off unless you kept them</li>
               </ol>
             </div>
             <div className="modal-section">
@@ -1005,7 +1093,7 @@ export default function App() {
                 One common place those notes hide is called EXIF — that’s just a label for a bundle of extra details cameras and phones attach to photos. There are other hiding spots too.
               </p>
               <p>
-                When you save in redax, those notes are left off the file for now, so the picture you share is just the picture.
+                When you save, extra notes are left off unless you choose to keep them. Open <strong>Notes</strong> on a photo to keep, edit, or remove location, date, captions, and camera. Everything else is left off.
               </p>
             </div>
             <div className="modal-footer">
