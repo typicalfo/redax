@@ -331,6 +331,7 @@ export default function App() {
   const [brushSize, setBrushSize] = useState(20)
   const [redactColor, setRedactColor] = useState('#000000')
   const [showAbout, setShowAbout] = useState(false)
+  const [showMetadata, setShowMetadata] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [selectedId, _setSelectedId] = useState(null)
   const [cropping, _setCropping] = useState(false)
@@ -338,16 +339,11 @@ export default function App() {
   const setCropping = (v) => { croppingRef.current = v; _setCropping(v) }
   const cropRef = useRef(null)
   const [, forceUpdate] = useState(0)
-  const [hasFaceDetector, setHasFaceDetector] = useState(typeof window.FaceDetector === 'function')
-  const [detecting, setDetecting] = useState(null) // 'faces' | 'text' | 'plates' | null
-  const [detectMsg, setDetectMsg] = useState(null)
-  const detectTimerRef = useRef(null)
-  const showDetectMsg = (msg) => {
-    clearTimeout(detectTimerRef.current)
-    setDetectMsg(msg)
-    if (msg) detectTimerRef.current = setTimeout(() => setDetectMsg(null), 2000)
-  }
   const showOriginalRef = useRef(false)
+
+  const openAbout = () => { setShowMetadata(false); setShowAbout(true) }
+  const openMetadata = () => { setShowAbout(false); setShowMetadata(true) }
+  const closeModals = () => { setShowAbout(false); setShowMetadata(false) }
 
   const setSelectedId = (id) => { selectedIdRef.current = id; _setSelectedId(id) }
   const getScale = () => { const c = canvasRef.current; if (!c) return 1; const r = c.getBoundingClientRect(); return c.width / (r.width || 1) }
@@ -428,13 +424,14 @@ export default function App() {
   }
   const redo = () => { if (!canRedo()) return; indexRef.current++; regionsRef.current = structuredClone(historyRef.current[indexRef.current]); setSelectedId(null); forceUpdate(n => n + 1) }
 
-  // Check FaceDetector support
   useEffect(() => {
-    if (typeof window.FaceDetector === 'function') {
-      try { new window.FaceDetector(); setHasFaceDetector(true) } catch { /* not supported */ }
+    if (!showAbout && !showMetadata) return
+    const onKey = (e) => {
+      if (e.key === 'Escape') closeModals()
     }
-  }, [])
-
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [showAbout, showMetadata])
 
   // Render after every React update
   useEffect(() => { if (loaded) render() })
@@ -535,7 +532,7 @@ export default function App() {
         const canvas = canvasRef.current
         canvas.width = img.width; canvas.height = img.height
         regionsRef.current = []; historyRef.current = [[]]; indexRef.current = 0; nextId = 1
-        setSelectedId(null); setLoaded(true); setDetectMsg(null)
+        setSelectedId(null); setLoaded(true)
         forceUpdate(n => n + 1); setTimeout(fitCanvas, 0)
       }
       img.src = ev.target.result
@@ -732,8 +729,8 @@ export default function App() {
     selectedIdRef.current = prev; render()
   }
 
-  const clear = () => { regionsRef.current = []; historyRef.current = [[]]; indexRef.current = 0; imageStackRef.current = []; setSelectedId(null); setDetectMsg(null); forceUpdate(n => n + 1) }
-  const removeImage = () => { setLoaded(false); imgRef.current = null; regionsRef.current = []; historyRef.current = [[]]; indexRef.current = 0; imageStackRef.current = []; setSelectedId(null); setCropping(false); cropRef.current = null; setDetectMsg(null); forceUpdate(n => n + 1) }
+  const clear = () => { regionsRef.current = []; historyRef.current = [[]]; indexRef.current = 0; imageStackRef.current = []; setSelectedId(null); forceUpdate(n => n + 1) }
+  const removeImage = () => { setLoaded(false); imgRef.current = null; regionsRef.current = []; historyRef.current = [[]]; indexRef.current = 0; imageStackRef.current = []; setSelectedId(null); setCropping(false); cropRef.current = null; forceUpdate(n => n + 1) }
 
   const transformImage = (fn) => {
     const img = imgRef.current; if (!img) return
@@ -790,112 +787,12 @@ export default function App() {
   }
   const cancelCrop = () => { cropRef.current = null; setCropping(false); forceUpdate(n => n + 1) }
 
-  const detectFaces = async () => {
-    if (!imgRef.current || detecting) return
-    if (!hasFaceDetector) {
-      showDetectMsg('Enable chrome://flags/#enable-experimental-web-platform-features and restart Chrome')
-      return
-    }
-    setDetecting('faces'); setDetectMsg(null)
-    try {
-      const detector = new window.FaceDetector({ maxDetectedFaces: 20, fastMode: false })
-      const img = imgRef.current
-      const allBoxes = []
-      // Detect at multiple scales to catch faces the OS misses
-      const scales = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 1.1, 1.2, 1.3, 1.5, 1.7, 2, 2.5, 3]
-      for (const scale of scales) {
-        const w = Math.round(img.width * scale), h = Math.round(img.height * scale)
-        if (w < 10 || h < 10 || w > 8000 || h > 8000) continue
-        const work = document.createElement('canvas')
-        work.width = w; work.height = h
-        const wctx = work.getContext('2d')
-        wctx.drawImage(img, 0, 0, w, h)
-        // Mask already-found faces so detector finds new ones
-        for (const b of allBoxes) {
-          wctx.fillStyle = '#888'
-          wctx.fillRect(b.x * scale, b.y * scale, b.w * scale, b.h * scale)
-        }
-        for (let pass = 0; pass < 5; pass++) {
-          const bitmap = await createImageBitmap(work)
-          const results = await detector.detect(bitmap)
-          bitmap.close()
-          if (results.length === 0) break
-          for (const r of results) {
-            const box = { x: r.boundingBox.x / scale, y: r.boundingBox.y / scale, w: r.boundingBox.width / scale, h: r.boundingBox.height / scale }
-            // Skip if overlaps an existing detection
-            const dominated = allBoxes.some(b => {
-              const ox = Math.max(0, Math.min(b.x + b.w, box.x + box.w) - Math.max(b.x, box.x))
-              const oy = Math.max(0, Math.min(b.y + b.h, box.y + box.h) - Math.max(b.y, box.y))
-              return (ox * oy) > Math.min(b.w * b.h, box.w * box.h) * 0.3
-            })
-            if (!dominated) allBoxes.push(box)
-            wctx.fillStyle = '#888'
-            wctx.fillRect(r.boundingBox.x, r.boundingBox.y, r.boundingBox.width, r.boundingBox.height)
-          }
-        }
-      }
-      if (allBoxes.length === 0) { showDetectMsg('No faces found'); setDetecting(null); return }
-      const newRegions = allBoxes.map(b => ({
-        id: String(nextId++),
-        x: b.x - b.w * 0.1, y: b.y - b.h * 0.1,
-        w: b.w * 1.2, h: b.h * 1.2,
-        mode, shape, blurAmount, chunky, chunkSize, color: redactColor, seed: Math.floor(Math.random() * 2 ** 32), rotation: 0,
-      }))
-      commitRegions([...regionsRef.current, ...newRegions])
-      showDetectMsg(`${allBoxes.length} face${allBoxes.length > 1 ? 's' : ''} found`)
-    } catch (err) {
-      showDetectMsg('Face detection failed')
-    }
-    setDetecting(null)
-  }
-
-  const detectText = async () => {
-    if (!imgRef.current || detecting) return
-    setDetecting('text'); setDetectMsg(null)
-    try {
-      const { createWorker } = await import('tesseract.js')
-      const worker = await createWorker('eng')
-      // Pass data URL for maximum compatibility
-      const offscreen = document.createElement('canvas')
-      offscreen.width = imgRef.current.width; offscreen.height = imgRef.current.height
-      offscreen.getContext('2d').drawImage(imgRef.current, 0, 0)
-      const dataUrl = offscreen.toDataURL('image/png')
-      const result = await worker.recognize(dataUrl, {}, { blocks: true })
-      await worker.terminate()
-      const words = []
-      for (const block of result.data.blocks || [])
-        for (const para of block.paragraphs || [])
-          for (const line of para.lines || [])
-            for (const word of line.words || [])
-              words.push(word)
-      const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/
-      const matches = words.filter(w => emailRegex.test(w.text))
-      if (matches.length === 0) { showDetectMsg('No emails found'); setDetecting(null); return }
-      const newRegions = matches.map(w => {
-        const b = w.bbox
-        const pad = 4
-        return {
-          id: String(nextId++),
-          x: b.x0 - pad, y: b.y0 - pad,
-          w: b.x1 - b.x0 + pad * 2, h: b.y1 - b.y0 + pad * 2,
-          mode, shape, blurAmount, chunky, chunkSize, color: redactColor, seed: Math.floor(Math.random() * 2 ** 32), rotation: 0,
-        }
-      })
-      commitRegions([...regionsRef.current, ...newRegions])
-      showDetectMsg(`${matches.length} email${matches.length > 1 ? 's' : ''} found`)
-    } catch (err) {
-      console.error('Tesseract OCR error:', err)
-      showDetectMsg('Text detection failed')
-    }
-    setDetecting(null)
-  }
-
-
   return (
     <>
       <div className="toolbar">
         <div className="toolbar-row">
-          <span className="logo" onClick={() => setShowAbout(true)}>redax</span>
+          <span className="logo" onClick={openAbout}>redax</span>
+          <button type="button" className="help-btn" title="What's metadata?" aria-label="What's metadata?" onClick={openMetadata}>?</button>
           <div className="sep" />
           <div className="toolbar-dropdown">
             <select value={mode} onChange={(e) => setMode(e.target.value)}>
@@ -912,19 +809,6 @@ export default function App() {
               <option value="ellipse">Ellipse</option>
             </select>
           </div>}
-          <div className="toolbar-dropdown">
-            {detecting && <span className="spinner" />}
-            <select disabled={!loaded || !!detecting} value="" onChange={(e) => {
-              const v = e.target.value; e.target.value = ''
-              if (v === 'faces') detectFaces()
-              else if (v === 'emails') detectText()
-            }}>
-              <option value="" disabled>{detecting ? 'Scanning...' : 'Auto Detect'}</option>
-              <option value="faces">Detect Faces</option>
-              <option value="emails">Detect Emails</option>
-            </select>
-          </div>
-          {detectMsg && <span className="detect-msg">{detectMsg}</span>}
           <button className="menu-toggle" onClick={() => setMenuOpen(v => !v)} title="More options">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
@@ -996,15 +880,51 @@ export default function App() {
         )}
       </div>
 
-      <div className="canvas-wrap" ref={wrapRef} onDrop={(e) => { e.preventDefault(); setFileDragging(false); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) loadFile(f) }} onDragOver={(e) => { e.preventDefault(); setFileDragging(true) }} onDragLeave={() => setFileDragging(false)}>
+      <div className={`canvas-wrap${!loaded ? ' landing-wrap' : ''}`} ref={wrapRef} onDrop={(e) => { e.preventDefault(); setFileDragging(false); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) loadFile(f) }} onDragOver={(e) => { e.preventDefault(); setFileDragging(true) }} onDragLeave={() => setFileDragging(false)}>
         {!loaded && (
           <div className={`drop-zone${fileDragging ? ' dragging' : ''}`}>
-            <div className="drop-target" onClick={() => fileRef.current.click()}>
-              <div className="icon">&#128444;&#65039;</div>
-              <div className="label">Drop an image file here</div>
-              <div className="sub">or click to browse</div>
+            <div className="landing">
+              <h1 className="landing-title">Let’s get your pics ready to share.</h1>
+              <p className="landing-lead">
+                Hide anything you wouldn’t want someone else to keep — a face, a name, a house number.
+                Then check the hidden notes photos can carry, and save.
+              </p>
+              <div className="drop-target" onClick={() => fileRef.current.click()}>
+                <div className="icon">&#128444;&#65039;</div>
+                <div className="label">Open or drop a photo</div>
+                <div className="sub">or paste with Ctrl+V / Cmd+V</div>
+              </div>
+              <ol className="landing-steps">
+                <li>
+                  <span className="step-n">1 · Open</span>
+                  Drop a photo here, click to browse, or paste.
+                </li>
+                <li>
+                  <span className="step-n">2 · Hide</span>
+                  Draw over what you want out of the picture.
+                </li>
+                <li>
+                  <span className="step-n">3 · Check</span>
+                  Photos can carry hidden notes.{' '}
+                  <button type="button" className="text-btn" onClick={openMetadata}>What’s metadata?</button>
+                </li>
+                <li>
+                  <span className="step-n">4 · Save</span>
+                  Download a copy you’re comfortable sharing.
+                </li>
+              </ol>
+              <p className="privacy-note">
+                <span className="lock">&#128274;</span>
+                Your photo stays on this device. Nothing is uploaded.
+              </p>
+              <p className="landing-links">
+                <button type="button" className="text-btn" onClick={openAbout}>About</button>
+                {' · '}
+                <a href="https://github.com/typicalfo/redax" target="_blank" rel="noopener noreferrer">View source</a>
+                {' · based on '}
+                <a href="https://github.com/creativar/blurrr" target="_blank" rel="noopener noreferrer">Blurrr</a>
+              </p>
             </div>
-            <div className="privacy-note"><span className="lock">&#128274;</span> Your images never leave your device. All processing happens locally. EXIF metadata is stripped on save. <a href="https://github.com/typicalfo/redax" target="_blank" rel="noopener noreferrer">View source</a> · based on <a href="https://github.com/creativar/blurrr" target="_blank" rel="noopener noreferrer">Blurrr</a></div>
           </div>
         )}
         <canvas ref={canvasRef} style={{ display: loaded ? 'block' : 'none', touchAction: 'none' }}
@@ -1017,48 +937,79 @@ export default function App() {
       <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onClick={(e) => { e.target.value = '' }} onChange={(e) => { if (e.target.files[0]) loadFile(e.target.files[0]) }} />
 
       {showAbout && (
-        <div className="modal-overlay" onClick={() => setShowAbout(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={closeModals}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="about-title" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <span className="logo">redax</span>
-              <button className="modal-close" onClick={() => setShowAbout(false)}>&times;</button>
+              <span className="logo" id="about-title">redax</span>
+              <button type="button" className="modal-close" onClick={closeModals} aria-label="Close">&times;</button>
             </div>
-            <p className="modal-tagline">A free, local photo privacy tool. Manual redaction, selective metadata next.</p>
-            <p>Blur, redact, erase, or brush what you choose to hide. Processing stays in your browser.</p>
+            <p className="modal-tagline">Let’s get your pics ready to share.</p>
+            <p>Hide faces, names, house numbers — whatever you don’t want in the picture. You choose what stays.</p>
             <div className="modal-section">
-              <h3>Privacy</h3>
-              <p>redax does not upload your photos. All image processing happens locally in your browser.</p>
-              <p>Saved images currently strip EXIF on export. A short metadata panel (keep / edit / remove location, date, captions, camera) is the next step — allowlist export, not copy-original-then-patch.</p>
-            </div>
-            <div className="modal-section">
-              <h3>How does it work?</h3>
+              <h3>How to</h3>
               <ol>
-                <li>You select an area on your image</li>
-                <li>The selected region is isolated</li>
-                <li>A Gaussian blur averages each pixel with its neighbours, smearing out detail</li>
-                <li>The area is replaced with the blurred result</li>
-              </ol>
-              <p>In <strong>Redact</strong> mode, the selected area is replaced with solid black for complete removal. Use <strong>Erase</strong> to paint areas white.</p>
-            </div>
-            <div className="modal-section">
-              <h3>How to use</h3>
-              <ol>
-                <li>Open, drop, or paste (<strong>Ctrl+V</strong>) an image</li>
-                <li>Pick a mode: <strong>Blur</strong>, <strong>Redact</strong>, or <strong>Erase</strong></li>
-                <li>Pick a shape and drag to create regions</li>
-                <li>Use <strong>Detect Faces</strong> or <strong>Detect Emails</strong> to auto-find sensitive areas</li>
-                <li>Click a region to select it — drag to move, use handles to resize, or click the red button to delete</li>
-                <li>Hold <strong>Alt</strong> to preview the original image</li>
-                <li>Save the result (EXIF metadata is automatically removed)</li>
+                <li>Open or drop a photo (or paste with <strong>Ctrl+V</strong> / <strong>Cmd+V</strong>)</li>
+                <li>Draw over what you want to hide — blur, black out, erase, or brush</li>
+                <li>Click a region to move, resize, or delete it</li>
+                <li>
+                  Check the hidden notes photos can carry.{' '}
+                  <button type="button" className="text-btn" onClick={openMetadata}>What’s metadata?</button>
+                </li>
+                <li>Save when you’re happy</li>
               </ol>
             </div>
             <div className="modal-section">
-              <h3>Source code</h3>
-              <p>redax is open source: <a href="https://github.com/typicalfo/redax" target="_blank" rel="noopener noreferrer">typicalfo/redax</a>.</p>
-              <p>Based on <a href="https://github.com/creativar/blurrr" target="_blank" rel="noopener noreferrer">Blurrr</a> by creativar — we extend their canvas; we did not rewrite it.</p>
+              <h3>On this device</h3>
+              <p>Your photo stays here. Nothing is uploaded.</p>
+            </div>
+            <div className="modal-section">
+              <h3>Source</h3>
+              <p>
+                Open source: <a href="https://github.com/typicalfo/redax" target="_blank" rel="noopener noreferrer">typicalfo/redax</a>.
+                Based on <a href="https://github.com/creativar/blurrr" target="_blank" rel="noopener noreferrer">Blurrr</a> — we extend their canvas; we didn’t rewrite it.
+              </p>
             </div>
             <div className="modal-footer">
-              <button className="primary" onClick={() => setShowAbout(false)}>Got it</button>
+              <button type="button" className="primary" onClick={closeModals}>Got it</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMetadata && (
+        <div className="modal-overlay" onClick={closeModals}>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="metadata-title" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="logo" id="metadata-title">What’s metadata?</span>
+              <button type="button" className="modal-close" onClick={closeModals} aria-label="Close">&times;</button>
+            </div>
+            <p className="modal-tagline">Hidden notes that can ride along with a photo.</p>
+            <p>
+              Photos can carry extra information tucked into the file — notes you don’t see when you look at the picture.
+            </p>
+            <div className="modal-section">
+              <h3>What might be in there</h3>
+              <ul>
+                <li>Where it was taken — a place name or a GPS pin</li>
+                <li>When it was taken</li>
+                <li>What camera or phone took it</li>
+                <li>Captions, titles, or keywords (sometimes names)</li>
+              </ul>
+            </div>
+            <div className="modal-section">
+              <h3>Why it matters</h3>
+              <p>
+                If you share the file, those notes can travel with it. A picture of your front porch might also say exactly where you live.
+              </p>
+              <p>
+                One common place those notes hide is called EXIF — that’s just a label for a bundle of extra details cameras and phones attach to photos. There are other hiding spots too.
+              </p>
+              <p>
+                When you save in redax, those notes are left off the file for now, so the picture you share is just the picture.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="primary" onClick={closeModals}>Got it</button>
             </div>
           </div>
         </div>
