@@ -38,3 +38,6 @@ clean-all: clean ## Remove dist/ and node_modules/
 
 reinstall: clean-all install ## Wipe node_modules/ and reinstall
 
+
+pages-url: ## Print the GitHub Pages URL
+	@echo "https://typicalfo.github.io/redax/"
