@@ -1,5 +1,4 @@
 import { useRef, useState, useEffect } from 'react'
-import { track } from './analytics'
 
 let nextId = 1
 
@@ -731,7 +730,6 @@ export default function App() {
     render({ showUI: false })
     const a = document.createElement('a'); a.download = fileName; a.href = canvasRef.current.toDataURL('image/png'); a.click()
     selectedIdRef.current = prev; render()
-    track('Image Saved', { props: { regions: String(regionsRef.current.length) } })
   }
 
   const clear = () => { regionsRef.current = []; historyRef.current = [[]]; indexRef.current = 0; imageStackRef.current = []; setSelectedId(null); setDetectMsg(null); forceUpdate(n => n + 1) }
@@ -897,7 +895,7 @@ export default function App() {
     <>
       <div className="toolbar">
         <div className="toolbar-row">
-          <span className="logo" onClick={() => setShowAbout(true)}>blurrr</span>
+          <span className="logo" onClick={() => setShowAbout(true)}>redax</span>
           <div className="sep" />
           <div className="toolbar-dropdown">
             <select value={mode} onChange={(e) => setMode(e.target.value)}>
@@ -1006,7 +1004,7 @@ export default function App() {
               <div className="label">Drop an image file here</div>
               <div className="sub">or click to browse</div>
             </div>
-            <div className="privacy-note"><span className="lock">&#128274;</span> Your images never leave your device. All processing happens locally. EXIF metadata is stripped on save. <a href="https://github.com/creativar/blurrr" target="_blank" rel="noopener noreferrer">View source</a></div>
+            <div className="privacy-note"><span className="lock">&#128274;</span> Your images never leave your device. All processing happens locally. EXIF metadata is stripped on save. <a href="https://github.com/typicalfo/redax" target="_blank" rel="noopener noreferrer">View source</a> · based on <a href="https://github.com/creativar/blurrr" target="_blank" rel="noopener noreferrer">Blurrr</a></div>
           </div>
         )}
         <canvas ref={canvasRef} style={{ display: loaded ? 'block' : 'none', touchAction: 'none' }}
@@ -1022,15 +1020,15 @@ export default function App() {
         <div className="modal-overlay" onClick={() => setShowAbout(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <span className="logo">blurrr</span>
+              <span className="logo">redax</span>
               <button className="modal-close" onClick={() => setShowAbout(false)}>&times;</button>
             </div>
-            <p className="modal-tagline">A fast, private image redaction tool.</p>
-            <p>Blur or redact sensitive areas in your images with a simple drag. Choose from multiple shapes and adjust blur strength to get the result you need.</p>
+            <p className="modal-tagline">A free, local photo privacy tool. Manual redaction, selective metadata next.</p>
+            <p>Blur, redact, erase, or brush what you choose to hide. Processing stays in your browser.</p>
             <div className="modal-section">
               <h3>Privacy</h3>
-              <p>blurrr does not send your images to a server. All image processing happens locally in your browser. Your files never leave your device.</p>
-              <p>Saved images have all EXIF metadata (location, camera info, timestamps) automatically stripped.</p>
+              <p>redax does not upload your photos. All image processing happens locally in your browser.</p>
+              <p>Saved images currently strip EXIF on export. A short metadata panel (keep / edit / remove location, date, captions, camera) is the next step — allowlist export, not copy-original-then-patch.</p>
             </div>
             <div className="modal-section">
               <h3>How does it work?</h3>
@@ -1056,7 +1054,8 @@ export default function App() {
             </div>
             <div className="modal-section">
               <h3>Source code</h3>
-              <p>blurrr is open source. <a href="https://github.com/creativar/blurrr" target="_blank" rel="noopener noreferrer">View the source on GitHub</a> to verify how your images are handled.</p>
+              <p>redax is open source: <a href="https://github.com/typicalfo/redax" target="_blank" rel="noopener noreferrer">typicalfo/redax</a>.</p>
+              <p>Based on <a href="https://github.com/creativar/blurrr" target="_blank" rel="noopener noreferrer">Blurrr</a> by creativar — we extend their canvas; we did not rewrite it.</p>
             </div>
             <div className="modal-footer">
               <button className="primary" onClick={() => setShowAbout(false)}>Got it</button>

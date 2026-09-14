@@ -1,7 +1,7 @@
 {
-  "name": "blur",
+  "name": "redax",
   "version": "1.0.0",
-  "description": "",
+  "description": "Local photo privacy tool: manual redaction plus selective metadata. Fork of Blurrr.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@plausible-analytics/tracker": "^0.4.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "tesseract.js": "^7.0.0"
