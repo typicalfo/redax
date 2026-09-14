@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import MetadataPanel from './MetadataPanel.jsx'
 import { emptySnapshot, imageOpenErrorNote, parsePhotoMetadata } from './metadata.js'
 import { exportRedactedImage } from './exportImage.js'
+import { applyTheme, persistTheme, resolveTheme, subscribeSystemTheme } from './theme'
 
 let nextId = 1
 
@@ -342,6 +343,13 @@ export default function App() {
   const loadGenRef = useRef(0)
   const savingRef = useRef(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [theme, setTheme] = useState(() => {
+    const attr = document.documentElement.getAttribute('data-theme')
+    if (attr === 'dark' || attr === 'light') return attr
+    const initial = resolveTheme()
+    applyTheme(initial)
+    return initial
+  })
   const [selectedId, _setSelectedId] = useState(null)
   const [cropping, _setCropping] = useState(false)
   const croppingRef = useRef(false)
@@ -433,6 +441,19 @@ export default function App() {
     }
   }
   const redo = () => { if (!canRedo()) return; indexRef.current++; regionsRef.current = structuredClone(historyRef.current[indexRef.current]); setSelectedId(null); forceUpdate(n => n + 1) }
+
+  useEffect(() => {
+    return subscribeSystemTheme((next) => {
+      applyTheme(next)
+      setTheme(next)
+    })
+  }, [])
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    persistTheme(next)
+    setTheme(next)
+  }
 
   useEffect(() => {
     if (!showAbout && !showMetadata && !showNotes) return
@@ -852,6 +873,25 @@ export default function App() {
         <div className="toolbar-row">
           <span className="logo" onClick={openAbout}>redax</span>
           <button type="button" className="help-btn" title="What's metadata?" aria-label="What's metadata?" onClick={openMetadata}>?</button>
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-pressed={theme === 'dark'}
+          >
+            {theme === 'dark' ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z" />
+              </svg>
+            )}
+          </button>
           <button
             type="button"
             className={showNotes ? 'active' : ''}
