@@ -7,8 +7,21 @@
   <meta name="description" content="Hide what you want in a photo, then save. Your pictures stay on this device." />
   <meta name="keywords" content="redax, blur, redact, image, privacy, metadata, screenshot, browser tool" />
   <meta name="author" content="typicalfo" />
-  <meta name="theme-color" content="#1d1d1d" />
+  <meta name="theme-color" content="#F4F6F8" />
   <link rel="canonical" href="https://github.com/typicalfo/redax" />
+  <script>
+    (function () {
+      var theme = 'light';
+      try {
+        var stored = localStorage.getItem('redax-theme');
+        if (stored === 'light' || stored === 'dark') theme = stored;
+        else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark';
+      } catch (e) {}
+      document.documentElement.setAttribute('data-theme', theme);
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute('content', theme === 'dark' ? '#2A2825' : '#F4F6F8');
+    })();
+  </script>
 
   <!-- Open Graph -->
   <meta property="og:type" content="website" />

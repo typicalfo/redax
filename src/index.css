@@ -2,17 +2,50 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-:root {
-  --bg: #1d1d1d;
-  --surface: #272727;
-  --surface-hover: #333;
-  --border: #3a3a3a;
-  --text: #eaeaea;
-  --text-dim: #999;
-  --accent: #5fb4e4;
-  --accent-hover: #76c8ff;
+/* Locked palettes — charcoal amber (dark) / slate sky (light). Shell only. */
+:root,
+:root[data-theme="light"] {
+  --bg: #F4F6F8;
+  --surface: #FFFFFF;
+  --surface-hover: #EAEFF4;
+  --canvas-bg: #E4E9EF;
+  --border: #D5DBE3;
+  --text: #2C3440;
+  --text-dim: #7A8494;
+  --accent: #4A7FB5;
+  --accent-hover: #3D6FA3;
+  --accent-soft: rgba(74, 127, 181, 0.12);
+  --accent-secondary: #5B6B7C;
+  --on-accent: #FFFFFF;
+  --overlay: rgba(44, 52, 64, 0.45);
+  --shadow: 0 12px 40px rgba(44, 52, 64, 0.14);
+  --pink: #ff3385;
+  --pink-dim: rgba(255, 51, 133, 0.12);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #2A2825;
+  --surface: #363330;
+  --surface-hover: #403C38;
+  --canvas-bg: #1F1D1B;
+  --border: #4A4641;
+  --text: #F2EDE6;
+  --text-dim: #A39E96;
+  --accent: #E0A84A;
+  --accent-hover: #EBB85E;
+  --accent-soft: rgba(224, 168, 74, 0.15);
+  --accent-secondary: #C9B896;
+  --on-accent: #1F1D1B;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   --pink: #ff3385;
   --pink-dim: rgba(255, 51, 133, 0.15);
+  color-scheme: dark;
+}
+
+html {
+  background: var(--bg);
 }
 
 body {
@@ -68,14 +101,14 @@ body {
 }
 
 .toolbar button:hover:not(:disabled) {
-  background: #444;
-  border-color: #555;
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .toolbar button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1d1d1d;
+  color: var(--on-accent);
   font-weight: 600;
 }
 .toolbar button.primary:hover:not(:disabled) {
@@ -169,21 +202,25 @@ body {
   padding: 7px 28px 7px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface-hover);
+  background-color: var(--surface-hover);
   color: var(--text);
   font-size: 13px;
   font-family: inherit;
   font-weight: 500;
   cursor: pointer;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237A8494' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
 }
 
+:root[data-theme="dark"] .toolbar-dropdown select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23A39E96' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
 .toolbar-dropdown select:hover {
-  background-color: #444;
-  border-color: #555;
+  background-color: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .toolbar-dropdown select:focus {
@@ -210,7 +247,8 @@ body {
 .sep { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
 .spacer { flex: 1; min-width: 0; }
 
-.toolbar button.help-btn {
+.toolbar button.help-btn,
+.toolbar button.theme-toggle {
   width: 28px;
   height: 28px;
   padding: 0;
@@ -218,6 +256,12 @@ body {
   font-weight: 600;
   font-size: 13px;
   color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.toolbar button.theme-toggle:hover:not(:disabled) {
+  color: var(--text);
 }
 
 .toolbar button.active {
@@ -273,7 +317,7 @@ body {
   align-items: center;
   justify-content: center;
   position: relative;
-  background: #151515;
+  background: var(--canvas-bg);
 }
 
 .notes-panel {
@@ -406,7 +450,7 @@ body {
 .seg button + button { border-left: 1px solid var(--border); }
 .seg button.on.keep {
   background: var(--accent);
-  color: #1d1d1d;
+  color: var(--on-accent);
 }
 .seg button.on.remove {
   background: var(--surface-hover);
@@ -524,7 +568,7 @@ body {
   display: block;
   font-size: 11px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-secondary);
   letter-spacing: 0.4px;
   text-transform: uppercase;
   margin-bottom: 6px;
@@ -563,14 +607,15 @@ body {
   height: 180px;
   border: 2px dashed var(--border);
   border-radius: 16px;
+  background: var(--surface);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .drop-target:hover,
 .drop-zone.dragging .drop-target {
-  border-color: var(--pink);
-  background: var(--pink-dim);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .drop-target .icon {
@@ -618,7 +663,7 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--overlay);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -636,6 +681,7 @@ body {
   max-height: 90vh;
   overflow-y: auto;
   line-height: 1.6;
+  box-shadow: var(--shadow);
 }
 
 .modal-header {
@@ -684,7 +730,7 @@ body {
 .modal-section h3 {
   font-size: 13px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 6px;
@@ -717,7 +763,7 @@ body {
   font-weight: 600;
   cursor: pointer;
   background: var(--accent);
-  color: #1d1d1d;
+  color: var(--on-accent);
   transition: background 0.15s;
 }
 .modal-footer button:hover { background: var(--accent-hover); }
@@ -749,7 +795,8 @@ body {
   .landing-title { font-size: 18px; }
   .landing-lead { font-size: 14px; }
   .landing-steps { grid-template-columns: 1fr 1fr; }
-  .toolbar button.help-btn { width: 26px; height: 26px; padding: 0; }
+  .toolbar button.help-btn,
+  .toolbar button.theme-toggle { width: 26px; height: 26px; padding: 0; }
   .heic-note { padding: 8px; font-size: 12px; }
 }
 
